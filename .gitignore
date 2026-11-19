@@ -1,0 +1,45 @@
+# Environment
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linting
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Local data
+data/
+
+# FAISS indexes
+*.faiss
+*.index
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+.vscode/
+.vscode
