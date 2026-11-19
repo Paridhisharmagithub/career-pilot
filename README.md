@@ -1,173 +1,266 @@
-# CareerPilot — Agentic AI Career Assistant
+# 🚀 CareerPilot — Agentic AI Career Assistant
 
-CareerPilot is an AI-powered career assistant built around a multi-agent workflow. It combines conversational memory, resume-grounded retrieval, candidate knowledge graphs, job-search tools, and response evaluation in a web application.
+> **An AI-powered career guidance platform built on multi-agent orchestration, Corrective RAG (CRAG), GraphRAG, and persistent semantic memory to deliver evidence-grounded career advice and live job discovery.**
 
-Built with **LangGraph, LangChain, FastAPI, PostgreSQL, FAISS, Neo4j, Exa MCP, and LangSmith**.
-
----
-
-## Core Workflows & Capabilities
-
-CareerPilot uses a routing agent to classify user intent and direct requests to specialized workflows:
-
-- **Candidate-Career Workflow:** Resume analysis, skill-gap and role-suitability analysis, and career/role recommendations grounded in resume evidence.
-- **Job-Search Workflow:** Discovers current openings using a DuckDuckGo-backed search tool.
-- **General Career Workflow:** Answers general career questions with external web research via an Exa MCP server.
-- **Corrective RAG (CRAG):** FAISS-backed resume retrieval includes relevance evaluation and context/query refinement before answer generation.
-- **Candidate GraphRAG:** Neo4j stores structured candidate entities and relationships extracted from resumes, queried alongside semantic resume evidence.
-- **Memory & Persistence:** Short-term conversation state (`AsyncPostgresSaver`), cross-conversation long-term semantic memory (`AsyncPostgresStore` with `pgvector`), and user/conversation/resume records in PostgreSQL.
-- **Authentication & Evaluation:** JWT access tokens with refresh sessions, LLM-based answer evaluation with refinement loops, and LangSmith execution tracing.
+This project addresses one of the core limitations of generic AI career tools: **generic, ungrounded career advice that ignores a candidate's real background and current market data**. Instead of relying on static prompts, CareerPilot transforms a candidate's resume into both a semantic vector store and a structured knowledge graph, routing requests across specialized AI agents with automated self-evaluation.
 
 ---
 
-## Architecture
+## 🎯 Motivation
 
-```mermaid
-flowchart TD
-    U[User interface<br/>HTML, CSS, JavaScript] --> API[FastAPI<br/>REST API and SSE chat]
-    API --> G[CareerPilot main LangGraph]
-    G --> M[Memory retrieval and conversation state]
-    M --> R[Intent routing agent]
-    R --> C[Candidate-career agent]
-    R --> J[Job-search agent]
-    R --> A[General-purpose agent]
-    C --> CR[Corrective RAG workflow]
-    C --> GR[Candidate GraphRAG workflow]
-    CR --> F[FAISS resume indexes]
-    GR --> N[Neo4j AuraDB]
-    J --> DD[DuckDuckGo search tool]
-    A --> EX[Exa MCP server]
-    G --> PG[(PostgreSQL<br/>users, conversations, messages,<br/>checkpoints and long-term memory)]
-    G --> E[Response evaluation and refinement]
-    E --> OUT[Streamed response to user]
+Navigating career transitions, identifying skill gaps, and tailoring job searches require deep context about both the **candidate's actual experience** and **real-time industry demand**. Standard LLM chatbots often hallucinate candidate qualifications, give vague recommendations, or fail to retain user context across sessions.
+
+CareerPilot solves this by combining **Multi-Agent Orchestration (LangGraph)**, **Corrective Retrieval-Augmented Generation (CRAG)**, and **GraphRAG (Neo4j)** with **long-term semantic memory**—ensuring every response is grounded in verified resume evidence, enriched by structured career relationships, and refined through automated quality evaluation.
+
+---
+
+## ✨ Core Features
+
+### 🧠 Multi-Agent Intent Routing & Orchestration
+
+- Uses a **LangGraph routing agent** to classify user intent (`job_search`, `resume_analysis`, `skill_gap`, `job_recommendation`, `general`) and delegate tasks to specialized workflows.
+- Coordinates parallel execution, tool invocation, and real-time **Server-Sent Events (SSE)** response streaming.
+
+### 📄 Intelligent Resume Ingestion & Dual Indexing
+
+- Parses uploaded PDF resumes using **PyMuPDF** and splits content into semantic chunks.
+- Builds dual representations: dense vector indexes in **FAISS** for semantic retrieval and structured entities/relationships in **Neo4j** for graph-based reasoning.
+
+### 🔍 Corrective RAG (CRAG) Pipeline
+
+- Evaluates retrieved FAISS resume chunks for relevance (`Relevant`, `Ambiguous`, or `Insufficient`) before answer generation.
+- Automatically triggers query rewriting and context refinement when evidence is weak, minimizing hallucinations.
+
+### 🕸️ Candidate Knowledge Graph (GraphRAG)
+
+- Extracts structured career entities (`Skill`, `Role`, `Company`, `Institution`, `Experience`, `Project`, `Research`, `Publication`, `Certification`) and relationships (`HAS_SKILL`, `WORKED_AT`, `STUDIED_AT`, `WORKED_ON`, etc.) into **Neo4j**.
+- Queries structured graph facts alongside vector retrieval for holistic candidate profiling.
+
+### 🌐 Real-Time Job Search & External Research
+
+- Integrates **DuckDuckGo Search** within the job-search agent to discover active, role-matched opportunities.
+- Connects to a remote **Exa MCP (Model Context Protocol)** server for deep external career and industry research.
+
+### 🧬 Short-Term State & Long-Term Semantic Memory
+
+- Persists conversation checkpoints via **LangGraph `AsyncPostgresSaver`** and cross-session semantic memories via **`AsyncPostgresStore` + `pgvector`** in **PostgreSQL**.
+- Remembers candidate goals, preferences, and past interactions across separate conversations.
+
+### ⚡ Self-Evaluating Response Refinement
+
+- Runs an **LLM-based evaluation workflow** on generated answers to verify grounding, completeness, and relevance, triggering automated refinement when needed.
+- Full execution tracing and observability powered by **LangSmith**.
+
+---
+
+## 🏗️ System Architecture
+
+```text
+                     ┌───────────────────────┐
+                     │   Web UI & PDF Resume │
+                     └──────────┬────────────┘
+                                │
+                    FastAPI REST & SSE Streaming
+                                │
+                                ▼
+               Memory Retrieval & Conversation State
+                     (PostgreSQL + pgvector)
+                                │
+                                ▼
+                   LangGraph Intent Routing Agent
+            ┌───────────────────┼───────────────────┐
+            │                   │                   │
+            ▼                   ▼                   ▼
+   Candidate-Career Agent   Job-Search Agent   General Career Agent
+     ┌──────┴──────┐            │                   │
+     ▼             ▼            ▼                   ▼
+Corrective RAG  GraphRAG   DuckDuckGo Search   Exa MCP Server
+   (FAISS)      (Neo4j)
+     └──────┬──────┘            │                   │
+            └───────────────────┼───────────────────┘
+                                │
+                                ▼
+              Response Evaluation & Refinement Loop
+                                │
+                                ▼
+               Streamed Response + LangSmith Traces
 ```
 
-### Supported Intents
+---
 
-| Intent | Purpose | Primary Context / Tools |
-|---|---|---|
-| `job_search` | Find current job openings | DuckDuckGo search tool |
-| `resume_analysis` | Analyze resume and experience | FAISS CRAG + Neo4j GraphRAG |
-| `skill_gap` | Identify missing skills for a target role | FAISS CRAG + Neo4j GraphRAG |
-| `job_recommendation` | Recommend suitable roles | FAISS CRAG + Neo4j GraphRAG + long-term memory |
-| `general` | Answer general career questions | Exa MCP server + memory |
+## 💡 Why This Approach?
+
+### 🔹 Corrective Retrieval over Blind Generation
+
+Instead of trusting raw vector search results, the **CRAG pipeline** grades retrieved resume chunks first and rewrites queries when context is ambiguous—ensuring responses stay strictly faithful to the candidate's actual resume.
+
+### 🔹 Hybrid Semantic + Graph Reasoning
+
+Vector search excels at unstructured descriptions, while **Neo4j GraphRAG** captures exact structural links (such as which skills were applied on which projects or roles). Combining both yields far deeper resume and skill-gap analysis.
+
+### 🔹 Agentic Specialization with Memory
+
+Separating candidate analysis, live job search, and general career research into dedicated **LangGraph** workflows prevents prompt bloat, while **pgvector long-term memory** personalizes advice over time.
+
+### 🔹 Built-In Quality Assurance & Observability
+
+Every response passes through an **automated evaluation gate** before streaming to the user, with end-to-end step tracing in **LangSmith**.
 
 ---
 
-## Resume Ingestion & Retrieval
-
-1. **Ingestion:** PDF resumes are parsed with PyMuPDF, split into chunks, embedded into FAISS indexes under `data/faiss/`, stored with metadata in PostgreSQL, and extracted into Neo4j entities (`Skill`, `Role`, `Company`, `Organization`, `Institution`, `Experience`, `Project`, `Research`, `Publication`, `Activity`, `Certification`) and relationships (`HAS_SKILL`, `HAS_EXPERIENCE`, `WORKED_AT`, `STUDIED_AT`, `WORKED_ON`, `CONDUCTED_RESEARCH`, `HAS_CERTIFICATION`).
-2. **Corrective RAG:** Retrieved FAISS chunks are evaluated for relevance; ambiguous or insufficient evidence triggers query rewriting or context refinement.
-3. **GraphRAG:** Structured candidate facts complement semantic chunks for candidate-specific questions (select a resume in the conversation before asking candidate-specific queries).
-
----
-
-## Tech Stack
+## 🛠️ Technology Stack
 
 | Layer | Technologies |
-|---|---|
-| Backend & API | Python 3.11, FastAPI, Uvicorn, Pydantic |
-| Agent & RAG | LangGraph, LangChain, FAISS, Neo4j, Custom CRAG |
-| Search & MCP | DuckDuckGo Search, Exa MCP |
-| Data & Memory | PostgreSQL, SQLAlchemy Async ORM, Alembic, pgvector, `AsyncPostgresSaver`, `AsyncPostgresStore` |
-| Auth & Observability | JWT, `pwdlib` / Argon2, LangSmith |
-| Frontend | HTML, CSS, vanilla JavaScript |
+| :--- | :--- |
+| **Frontend** | HTML5, CSS3, Vanilla JavaScript (SSE Streaming) |
+| **Backend & API** | Python 3.11, FastAPI, Uvicorn, Pydantic |
+| **Agent Orchestration** | LangGraph, LangChain |
+| **LLMs** | OpenAI (`gpt-4o-mini`, `gpt-4o`) |
+| **Vector Search & CRAG** | FAISS, Custom LangGraph Evaluation Workflow |
+| **Knowledge Graph (GraphRAG)** | Neo4j AuraDB |
+| **External Tools & MCP** | DuckDuckGo Search, Exa MCP Server |
+| **Database & Memory** | PostgreSQL, SQLAlchemy Async ORM, Alembic, `pgvector` |
+| **Document Processing** | PyMuPDF |
+| **Authentication** | JWT, Argon2 (`pwdlib`), Server-Side Refresh Sessions |
+| **Observability** | LangSmith |
 
 ---
 
-## Repository Structure
+## 🔬 End-to-End AI Pipeline
+
+1. **Resume Ingestion:** User uploads a PDF resume; **PyMuPDF** extracts text, which is chunked and indexed into **FAISS** while structured entities and relationships are extracted into **Neo4j**.
+2. **Request & Memory Load:** User submits a query in a resume-linked conversation; **FastAPI** loads short-term checkpoints and retrieves relevant long-term memories from **PostgreSQL (`pgvector`)**.
+3. **Intent Routing:** The **LangGraph routing agent** classifies the request (`resume_analysis`, `skill_gap`, `job_recommendation`, `job_search`, or `general`).
+4. **Parallel Context & Tool Execution:**
+   - *Candidate queries* trigger **FAISS CRAG** (with relevance grading and query rewriting) alongside **Neo4j GraphRAG**.
+   - *Job queries* invoke **DuckDuckGo Search** for live openings.
+   - *General queries* leverage the **Exa MCP** server for web research.
+5. **Evaluation & Streaming:** The **response evaluator** checks answer quality, triggers refinement if necessary, persists conversation state, and streams the final response to the UI.
+
+---
+
+## 📈 Key Capabilities
+
+- ✅ Multi-agent intent routing with **LangGraph**
+- ✅ Resume-grounded analysis via **Corrective RAG (FAISS)**
+- ✅ Structured candidate reasoning via **GraphRAG (Neo4j)**
+- ✅ Live job discovery via **DuckDuckGo Search**
+- ✅ External career research via **Exa MCP**
+- ✅ Short-term and cross-session semantic memory with **PostgreSQL & pgvector**
+- ✅ Automated LLM response evaluation and refinement
+- ✅ JWT + refresh-token authentication and **LangSmith** observability
+
+---
+
+## 📂 Repository Structure
 
 ```text
 .
-├── frontend/
+├── frontend/                  # Web interface (HTML, CSS, vanilla JS)
 │   ├── index.html
 │   ├── css/style.css
 │   └── js/{api,auth,conversations,chat,app}.js
 ├── src/
 │   ├── components/
-│   │   ├── agents/
-│   │   ├── auth/
-│   │   ├── conversations/
-│   │   ├── crag/
-│   │   ├── database/
-│   │   ├── evaluation/
-│   │   ├── graph/
-│   │   ├── graphrag/
-│   │   ├── llm/
-│   │   ├── mcp/
-│   │   ├── memory/
-│   │   ├── messages/
-│   │   ├── resume/
-│   │   └── retrieval/
-│   ├── constants/
-│   ├── routes/
-│   └── utils/
-├── alembic/
-│   └── versions/
-├── data/
-│   └── faiss/
-├── alembic.ini
-├── main.py
+│   │   ├── agents/            # Routing, candidate, job-search, and general agents
+│   │   ├── auth/              # JWT and refresh session handling
+│   │   ├── conversations/     # Conversation management
+│   │   ├── crag/              # Corrective RAG evaluation & refinement
+│   │   ├── database/          # Async SQLAlchemy models & sessions
+│   │   ├── evaluation/        # Response quality evaluation workflow
+│   │   ├── graph/             # Main LangGraph definition
+│   │   ├── graphrag/          # Neo4j extraction & graph querying
+│   │   ├── llm/               # LLM client configuration
+│   │   ├── mcp/               # Exa MCP client integration
+│   │   ├── memory/            # Checkpointer & pgvector long-term memory
+│   │   ├── messages/          # Message persistence
+│   │   ├── resume/            # PyMuPDF parsing & indexing pipeline
+│   │   └── retrieval/         # FAISS vector retrieval
+│   ├── constants/             # App settings & environment config
+│   ├── routes/                # FastAPI endpoints (auth, chat, resumes, conversations)
+│   └── utils/                 # Shared helpers
+├── alembic/                   # Database migrations
+├── data/faiss/                # Local FAISS vector indexes
+├── main.py                    # FastAPI application entrypoint
 ├── pyproject.toml
 └── requirements.txt
 ```
 
 ---
 
-## API Endpoints
+## 🌟 Future Enhancements
 
-- **Auth:** `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
-- **Conversations:** `POST /conversations`, `GET /conversations`, `DELETE /conversations/{conversation_id}`, `GET /conversations/{conversation_id}/messages`
-- **Resumes:** `POST /resumes`, `GET /resumes`, `DELETE /resumes/{resume_id}`
-- **Chat & App:** `GET /`, `GET /chat/conversations/{conversation_id}/resume`, `POST /chat/conversations/{conversation_id}/stream`, `GET /health`, plus `/docs` for interactive OpenAPI docs.
+- Interactive skill-gap roadmap generator with milestone tracking.
+- Automated resume tailoring and ATS keyword optimization per target job description.
+- Mock interview agent grounded in the candidate's Neo4j project and experience graph.
+- Multi-resume comparison and version tracking across target career tracks.
 
 ---
 
-## Configuration
+## ⚙️ Getting Started
 
-Configure environment variables in `.env` (see `src/constants/settings.py` for all options and defaults):
+### 1. Clone the Repository
+
+```bash
+git clone <your-repository-url>
+cd <your-repository-folder>
+```
+
+### 2. Create a Virtual Environment & Install Dependencies
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the project root (see `src/constants/settings.py` for all available options):
 
 ```env
+# PostgreSQL
 DATABASE_URL=
+
+# OpenAI
 OPENAI_API_KEY=
 
+# Neo4j
 NEO4J_URI=
 NEO4J_USERNAME=
 NEO4J_PASSWORD=
 NEO4J_DATABASE=neo4j
 
+# Exa MCP
 EXA_MCP_URL=https://mcp.exa.ai/mcp
 
+# LangSmith
 LANGSMITH_TRACING=true
 LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=careerpilot
 
+# Authentication
 JWT_SECRET_KEY=
 REFRESH_COOKIE_NAME=careerpilot_refresh_token
 REFRESH_COOKIE_SECURE=false
 ```
 
----
-
-## Local Setup
-
-1. Create a virtual environment and install dependencies from `requirements.txt` or `pyproject.toml`.
-2. Populate `.env` with your PostgreSQL, OpenAI, Neo4j, Exa MCP, LangSmith, and JWT settings.
-3. Run database migrations:
+### 4. Apply Database Migrations
 
 ```bash
 python -m alembic upgrade head
 ```
 
-4. Start the server:
+### 5. Run the Application
 
 ```bash
 uvicorn main:app --reload
 ```
 
+Once running, access the web interface at `http://localhost:8000` and the interactive API documentation at `http://localhost:8000/docs`.
+
 ---
 
-## Security & Privacy Notes
+## 🤝 Contributing
 
-- Keep `.env`, credentials, tokens, uploaded resumes, and local `data/faiss/` indexes out of version control.
-- Use a strong `JWT_SECRET_KEY` and review external LLM, search, and MCP data-handling terms before uploading personal resumes.
+Contributions, feature suggestions, and discussions are welcome. Feel free to fork the repository, open an issue, or submit a pull request.
